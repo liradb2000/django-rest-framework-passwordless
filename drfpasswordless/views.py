@@ -147,7 +147,7 @@ class AbstractBaseObtainAuthToken(APIView):
 
     def serialize_response_data(self, instance):
         TokenSerializer = api_settings.PASSWORDLESS_AUTH_TOKEN_SERIALIZER
-        token_serializer = TokenSerializer(data=instance.__dict__, partial=True)
+        token_serializer = TokenSerializer(instance)
         return token_serializer
 
     def post(self, request, *args, **kwargs):
@@ -158,8 +158,7 @@ class AbstractBaseObtainAuthToken(APIView):
 
             if instance:
                 token_serializer = self.serialize_response_data(instance)
-                if token_serializer.is_valid():
-                    return self.modify_response(Response(data=token_serializer.data, status=status.HTTP_200_OK), instance)
+                return self.modify_response(Response(data=token_serializer.data, status=status.HTTP_200_OK), instance)
         else:
             logger.error("Couldn't log in unknown user. Errors on serializer: {}".format(
                 serializer.error_messages))
