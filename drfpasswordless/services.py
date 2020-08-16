@@ -11,8 +11,6 @@ class TokenService(object):
         token = create_callback_token_for_user(user, alias_type, token_type)
         send_action = None
 
-        if user.pk in api_settings.PASSWORDLESS_DEMO_USERS.keys():
-            return True
         if alias_type == 'email':
             send_action = import_string(api_settings.PASSWORDLESS_EMAIL_CALLBACK)
         elif alias_type == 'mobile':
