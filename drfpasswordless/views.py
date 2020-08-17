@@ -149,7 +149,7 @@ class AbstractBaseObtainAuthToken(APIView):
         return token_serializer
 
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
             instance, is_created = self.auth_token_creator(user)

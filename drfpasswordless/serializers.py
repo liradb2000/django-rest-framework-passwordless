@@ -172,7 +172,7 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
         # Check Aliases
         try:
             alias_type, alias = self.validate_alias(attrs)
-            callback_token = attrs.get('token', None)
+            callback_token = attrs.pop('token', None)
             token = CallbackToken.objects.get(**{'to_alias': alias,
                                                  'key': callback_token,
                                                  'type': CallbackToken.TOKEN_TYPE_AUTH,
@@ -185,9 +185,11 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
                     try:
                         user = User.objects.get(**{alias_type+'__iexact': alias})
                     except User.DoesNotExist:
-                        user = User(**{alias_type: alias})
-                        user.set_unusable_password()
-                        user.save()
+                        valid_user_serializer=api_settings.PASSWORDLESS_CREATE_USER_SERIALIZER(data=self.context["request"].data)
+                        if valid_user_serializer.is_valid(raise_exception=True):
+                            user = User(**{alias_type: alias}, **valid_user_serializer.validated_data)
+                            user.set_unusable_password()
+                            user.save()
                 else:
                     # If new aliases should not register new users.
                     try:
@@ -213,8 +215,7 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
                         raise serializers.ValidationError(msg)
 
                 attrs['user'] = user
-                token.is_active=False
-                token.save(update_fields=['is_active'])
+                token.delete()
                 return attrs
             else:
                 msg = _('Invalid Token')
@@ -291,3 +292,5 @@ class TokenResponseSerializer(serializers.Serializer):
     key = serializers.CharField(write_only=True)
 
 
+class CreateUserSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)

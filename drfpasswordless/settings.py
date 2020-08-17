@@ -86,6 +86,9 @@ DEFAULTS = {
     'PASSWORDLESS_EMAIL_CALLBACK': 'drfpasswordless.utils.send_email_with_callback_token',
     'PASSWORDLESS_SMS_CALLBACK': 'drfpasswordless.utils.send_sms_with_callback_token',
 
+    # Custom USER serializer
+    'PASSWORDLESS_CREATE_USER_SERIALIZER' : 'drfpasswordless.serializers.CreateUserSerializer',
+
 }
 
 # List of settings that may be in string import notation.
@@ -94,6 +97,7 @@ IMPORT_STRINGS = (
     'PASSWORDLESS_CONTEXT_PROCESSORS',
     'PASSWORDLESS_AUTH_TOKEN_CREATOR',
     'PASSWORDLESS_AUTH_TOKEN_SERIALIZER',
+    'PASSWORDLESS_CREATE_USER_SERIALIZER',
 )
 
 class passworldless_APISettings(APISettings):

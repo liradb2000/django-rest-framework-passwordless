@@ -37,9 +37,7 @@ def create_callback_token_for_user(to_alias, alias_type, token_type):
     token = None
     alias_type_u = alias_type.upper()
     
-    token = CallbackToken.objects.update_or_create(to_alias_type=alias_type_u, to_alias=to_alias, type=token_type)
-
-
+    token, _ = CallbackToken.objects.update_or_create(to_alias_type=alias_type_u, to_alias=to_alias, type=token_type)
 
     if token is not None:
         return token
@@ -60,8 +58,7 @@ def validate_token_age(token):
             return True
         else:
             # Invalidate our token.
-            token.is_active = False
-            token.save()
+            token.delete()
             return False
 
     except CallbackToken.DoesNotExist:
@@ -120,7 +117,7 @@ def send_email_with_callback_token(to_alias, email_token, **kwargs):
                 email_subject,
                 email_plaintext % email_token.key,
                 api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                to_alias,
+                (to_alias, ),
                 fail_silently=False,
                 html_message=html_message,)
 
@@ -130,9 +127,7 @@ def send_email_with_callback_token(to_alias, email_token, **kwargs):
         return True
 
     except Exception as e:
-        logger.debug("Failed to send token email to user: %d."
-                  "Possibly no email on user object. Email entered was %s" %
-                  (user.id, getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)))
+        logger.debug("Failed to send token email. Email entered was %s" % (to_alias))
         logger.debug(e)
         return False
 
