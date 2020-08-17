@@ -1,5 +1,4 @@
 import logging
-from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.db.models import signals
 from drfpasswordless.models import CallbackToken

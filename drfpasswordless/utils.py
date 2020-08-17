@@ -1,6 +1,5 @@
 import logging
 import os
-from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.template import loader
@@ -11,39 +10,34 @@ from drfpasswordless.settings import api_settings
 
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
 
 
-def authenticate_by_token(callback_token):
-    try:
-        token = CallbackToken.objects.get(key=callback_token, is_active=True, type=CallbackToken.TOKEN_TYPE_AUTH)
+# def authenticate_by_token(callback_token):
+#     try:
+#         token = CallbackToken.objects.get(key=callback_token, is_active=True, type=CallbackToken.TOKEN_TYPE_AUTH)
 
-        # Returning a user designates a successful authentication.
-        token.user = User.objects.get(pk=token.user.pk)
-        token.is_active = False  # Mark this token as used.
-        token.save()
+#         # Returning a user designates a successful authentication.
+#         token.user = User.objects.get(pk=token.user.pk)
+#         token.is_active = False  # Mark this token as used.
+#         token.save()
 
-        return token.user
+#         return token.user
 
-    except CallbackToken.DoesNotExist:
-        logger.debug("drfpasswordless: Challenged with a callback token that doesn't exist.")
-    except User.DoesNotExist:
-        logger.debug("drfpasswordless: Authenticated user somehow doesn't exist.")
-    except PermissionDenied:
-        logger.debug("drfpasswordless: Permission denied while authenticating.")
+#     except CallbackToken.DoesNotExist:
+#         logger.debug("drfpasswordless: Challenged with a callback token that doesn't exist.")
+#     except User.DoesNotExist:
+#         logger.debug("drfpasswordless: Authenticated user somehow doesn't exist.")
+#     except PermissionDenied:
+#         logger.debug("drfpasswordless: Permission denied while authenticating.")
 
-    return None
+#     return None
 
 
-def create_callback_token_for_user(user, alias_type, token_type):
+def create_callback_token_for_user(to_alias, alias_type, token_type):
     token = None
     alias_type_u = alias_type.upper()
-    to_alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
     
-    token = CallbackToken.objects.update_or_create(user=user,
-                                            to_alias_type=alias_type_u,
-                                            to_alias=getattr(user, to_alias_field),
-                                            type=token_type)
+    token = CallbackToken.objects.update_or_create(to_alias_type=alias_type_u, to_alias=to_alias, type=token_type)
 
 
 
@@ -100,7 +94,7 @@ def inject_template_context(context):
     return context
 
 
-def send_email_with_callback_token(user, email_token, **kwargs):
+def send_email_with_callback_token(to_alias, email_token, **kwargs):
     """
     Sends a Email to user.email.
 
@@ -126,7 +120,7 @@ def send_email_with_callback_token(user, email_token, **kwargs):
                 email_subject,
                 email_plaintext % email_token.key,
                 api_settings.PASSWORDLESS_EMAIL_NOREPLY_ADDRESS,
-                [getattr(user, api_settings.PASSWORDLESS_USER_EMAIL_FIELD_NAME)],
+                to_alias,
                 fail_silently=False,
                 html_message=html_message,)
 

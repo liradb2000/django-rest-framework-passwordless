@@ -1,17 +1,15 @@
 import logging
-from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth import get_user_model
+from django.utils.translation import ugettext_lazy as _
 from django.core.exceptions import PermissionDenied
 from django.core.validators import RegexValidator
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from drfpasswordless.models import CallbackToken
 from drfpasswordless.settings import api_settings
-from drfpasswordless.utils import authenticate_by_token, verify_user_alias, validate_token_age
+from drfpasswordless.utils import verify_user_alias, validate_token_age
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
-
 
 class TokenField(serializers.CharField):
     default_error_messages = {
@@ -37,38 +35,11 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
     def validate(self, attrs):
         alias = attrs.get(self.alias_type)
 
-        if alias:
-            # Create or authenticate a user
-            # Return THem
-
-            if api_settings.PASSWORDLESS_REGISTER_NEW_USERS is True:
-                # If new aliases should register new users.
-                try:
-                    user = User.objects.get(**{self.alias_type+'__iexact': alias})
-                except User.DoesNotExist:
-                    user = User.objects.create(**{self.alias_type: alias})
-                    user.set_unusable_password()
-                    user.save()
-            else:
-                # If new aliases should not register new users.
-                try:
-                    user = User.objects.get(**{self.alias_type+'__iexact': alias})
-                except User.DoesNotExist:
-                    user = None
-
-            if user:
-                if not user.is_active:
-                    # If valid, return attrs so we can create a token in our logic controller
-                    msg = _('User account is disabled.')
-                    raise serializers.ValidationError(msg)
-            else:
-                msg = _('No account is associated with this alias.')
-                raise serializers.ValidationError(msg)
-        else:
+        if not alias:
             msg = _('Missing %s.') % self.alias_type
             raise serializers.ValidationError(msg)
 
-        attrs['user'] = user
+        attrs['to_alias'] = alias
         return attrs
 
 
@@ -196,22 +167,40 @@ class AbstractBaseCallbackTokenSerializer(serializers.Serializer):
 
 
 class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
-
     def validate(self, attrs):
+        User = get_user_model()
         # Check Aliases
         try:
             alias_type, alias = self.validate_alias(attrs)
             callback_token = attrs.get('token', None)
-            user = User.objects.get(**{alias_type+'__iexact': alias})
-            token = CallbackToken.objects.get(**{'user': user,
+            token = CallbackToken.objects.get(**{'to_alias': alias,
                                                  'key': callback_token,
                                                  'type': CallbackToken.TOKEN_TYPE_AUTH,
                                                  'is_active': True})
             if token_age_validator(token):
                 # Check the token type for our uni-auth method.
                 # authenticates and checks the expiry of the callback token.
-                if not user.is_active:
-                    msg = _('User account is disabled.')
+                if api_settings.PASSWORDLESS_REGISTER_NEW_USERS is True:
+                    # If new aliases should register new users.
+                    try:
+                        user = User.objects.get(**{alias_type+'__iexact': alias})
+                    except User.DoesNotExist:
+                        user = User(**{alias_type: alias})
+                        user.set_unusable_password()
+                        user.save()
+                else:
+                    # If new aliases should not register new users.
+                    try:
+                        user = User.objects.get(**{alias_type+'__iexact': alias})
+                    except User.DoesNotExist:
+                        user = None
+
+                if user:
+                    if not user.is_active:
+                        msg = _('User account is disabled.')
+                        raise serializers.ValidationError(msg)
+                else:
+                    msg = _('No account is associated with this alias.')
                     raise serializers.ValidationError(msg)
 
                 if api_settings.PASSWORDLESS_USER_MARK_EMAIL_VERIFIED \
@@ -227,10 +216,10 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
                 token.is_active=False
                 token.save(update_fields=['is_active'])
                 return attrs
-
             else:
                 msg = _('Invalid Token')
                 raise serializers.ValidationError(msg)
+
         except CallbackToken.DoesNotExist:
             msg = _('Invalid alias parameters provided.')
             raise serializers.ValidationError(msg)
@@ -249,13 +238,14 @@ class CallbackTokenVerificationSerializer(AbstractBaseCallbackTokenSerializer):
     """
 
     def validate(self, attrs):
+        User = get_user_model()
         try:
             alias_type, alias = self.validate_alias(attrs)
             user_id = self.context.get("user_id")
             user = User.objects.get(**{'id': user_id, alias_type+'__iexact': alias})
             callback_token = attrs.get('token', None)
 
-            token = CallbackToken.objects.get(**{'user': user,
+            token = CallbackToken.objects.get(**{'user': user[alias_type],
                                                  'key': callback_token,
                                                  'type': CallbackToken.TOKEN_TYPE_VERIFY,
                                                  'is_active': True})
