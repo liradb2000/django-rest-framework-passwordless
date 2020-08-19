@@ -190,6 +190,8 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
                             user = User(**{alias_type: alias}, **valid_user_serializer.validated_data)
                             user.set_unusable_password()
                             user.save()
+                        else:
+                            raise serializers.ValidationError(valid_user_serializer.error_messages)
                 else:
                     # If new aliases should not register new users.
                     try:
@@ -221,15 +223,15 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
                 msg = _('Invalid Token')
                 raise serializers.ValidationError(msg)
 
+        except ValidationError as err_with_msg:
+            raise err_with_msg
         except CallbackToken.DoesNotExist:
-            msg = _('Invalid alias parameters provided.')
+            msg = _('Invalid TOKEN provided.')
             raise serializers.ValidationError(msg)
         except User.DoesNotExist:
             msg = _('Invalid user alias parameters provided.')
             raise serializers.ValidationError(msg)
-        except ValidationError:
-            msg = _('Invalid alias parameters provided.')
-            raise serializers.ValidationError(msg)
+        
 
 
 class CallbackTokenVerificationSerializer(AbstractBaseCallbackTokenSerializer):
